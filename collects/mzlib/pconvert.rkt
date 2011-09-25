@@ -1,8 +1,8 @@
 
 (module pconvert mzscheme
   
-  (require (only "list.rkt" sort)
-           scheme/mpair
+  (require (only racket/base sort)
+           racket/mpair
 	   "pconvert-prop.rkt"
            "class.rkt")
   
@@ -576,6 +576,7 @@
         (current-print (lambda (v)
                          (unless (void? v)
                            (print (print-convert v))))))
+      (print-as-expression #f)
       (current-prompt-read (lambda ()
                              (display (current-read-eval-convert-print-prompt))
                              (read-syntax 'STDIN))))))
