@@ -371,12 +371,19 @@
                                           `(cons ,(recur k) ,(recur v))))]
                                       [constructor
                                        (cond
-                                         [(hash-table? expr 'weak 'equal) 'make-weak-hash]
-                                         [(hash-table? expr 'equal) 'make-hash]
-                                         [(hash-table? expr 'weak 'eqv) 'make-weak-hasheqv]
-                                         [(hash-table? expr 'eqv) 'make-hasheqv]
-                                         [(hash-table? expr 'weak) 'make-weak-hasheq]
-                                         [(hash-table? expr) 'make-hasheq])])
+                                         [(immutable? expr)
+                                          (cond
+                                            [(hash-table? expr 'equal) 'make-immutable-hash]
+                                            [(hash-table? expr 'eqv) 'make-immutable-hasheqv]
+                                            [(hash-table? expr) 'make-immutable-hasheq])]
+                                         [else
+                                          (cond
+                                            [(hash-table? expr 'weak 'equal) 'make-weak-hash]
+                                            [(hash-table? expr 'equal) 'make-hash]
+                                            [(hash-table? expr 'weak 'eqv) 'make-weak-hasheqv]
+                                            [(hash-table? expr 'eqv) 'make-hasheqv]
+                                            [(hash-table? expr 'weak) 'make-weak-hasheq]
+                                            [(hash-table? expr) 'make-hasheq])])])
                                   (if (null? contents)
                                       `(,constructor)
                                       `(,constructor (list ,@contents))))]
