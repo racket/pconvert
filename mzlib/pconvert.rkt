@@ -455,6 +455,10 @@
                                      (object-name expr))
                                 `(open-output-file ,(object-name expr))]
                                [(port? expr) expr]
+                               [(prefab-struct-key expr) ; (prefab-struct? expr)
+                                `(make-prefab-struct
+                                  ,(recur (prefab-struct-key expr))
+                                  ,@(map recur (cdr (vector->list (struct->vector expr)))))]
                                
                                ;; this case must be next to last, so that all of the
                                ;; things with object-name's fall into the cases above first
