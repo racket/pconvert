@@ -5,6 +5,7 @@
            compatibility/mlist
 	   "pconvert-prop.rkt"
            racket/class
+           racket/struct
            racket/undefined)
   
   (provide show-sharing
@@ -466,6 +467,13 @@
                                   ,@(for/list ([v (in-vector (struct->vector expr))]
                                                [i (in-naturals)] #:unless (zero? i))
                                       (recur v)))]
+                               [(constructor-style-printer? expr)
+                                (let* ([constructor (constructor-style-printer-constructor expr)]
+                                       [constructor (if (symbol? constructor)
+                                                        constructor
+                                                        (string->symbol constructor))])
+                                  `(,constructor
+                                    ,@(map recur (constructor-style-printer-contents expr))))]
                                
                                ;; this case must be next to last, so that all of the
                                ;; things with object-name's fall into the cases above first
