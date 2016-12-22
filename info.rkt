@@ -5,4 +5,6 @@
 
 (define pkg-desc "Legacy library for printing Racket values")
 
+(define version "1.1")
+
 (define pkg-authors '(robby))
