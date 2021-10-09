@@ -8,3 +8,6 @@
 (define version "1.0")
 
 (define pkg-authors '(robby))
+
+(define license
+  '(Apache-2.0 OR MIT))
