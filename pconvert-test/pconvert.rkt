@@ -1,19 +1,20 @@
-
-(load-relative "loadtest.rktl")
-
-(Section 'pconvert)
-
+#lang racket/base
 (require mzlib/file
          mzlib/class
          mzlib/pconvert
-         mzlib/pconvert-prop)
+         mzlib/pconvert-prop
+         rackunit
+         racket/promise)
 
 (constructor-style-printing #t)
 (quasi-read-style-printing #f)
 (add-make-prefix-to-constructor #t)
 
 (define (xl) 1)
-(define (xc) (class object% (sequence (super-init))))
+(define (xc) (class object% (super-new)))
+(define namespace-with-xl-and-xc (make-base-namespace))
+(eval `(define xc ,xc) namespace-with-xl-and-xc)
+(eval `(define xl ,xl) namespace-with-xl-and-xc)
 
 (let ()
   (define-struct pctest (value constructor-sexp
@@ -45,17 +46,20 @@
                                 sharing?
                                 cons-as-list?
                                 whole/fractional-numbers?)
-                (unless (parameterize ([constructor-style-printing constructor-style?]
-                                       [show-sharing sharing?]
-                                       [quasi-read-style-printing quasi-read?]
-                                       [abbreviate-cons-as-list cons-as-list?]
-                                       [whole/fractional-exact-numbers whole/fractional-numbers?])
-                          (test (selector test-case) print-convert before))
-                  (printf
-                   ">> (constructor-style-printing ~a) (quasi-read-style-printing ~a) (show-sharing ~a) (abbreviate-cons-as-list ~a) (whole/fractional-exact-numbers ~a)\n"
-                   constructor-style? quasi-read? 
-                   sharing? cons-as-list?
-                   whole/fractional-numbers?)))])
+                (parameterize ([constructor-style-printing constructor-style?]
+                               [show-sharing sharing?]
+                               [quasi-read-style-printing quasi-read?]
+                               [abbreviate-cons-as-list cons-as-list?]
+                               [whole/fractional-exact-numbers whole/fractional-numbers?]
+                               [current-namespace namespace-with-xl-and-xc])
+                  (check-equal? (print-convert before)
+                                (selector test-case)
+                                (format
+                                 "input using ~~s: ~s (constructor-style-printing ~a) (quasi-read-style-printing ~a) (show-sharing ~a) (abbreviate-cons-as-list ~a) (whole/fractional-exact-numbers ~a)\n"
+                                 before
+                                 constructor-style? quasi-read? 
+                                 sharing? cons-as-list?
+                                 whole/fractional-numbers?))))])
         ;(printf "testing: ~s\n" before)
         ;(printf ".") (flush-output (current-output-port))
         (cond
@@ -344,12 +348,13 @@
                        [show-sharing #t]
                        [quasi-read-style-printing #f]
                        [abbreviate-cons-as-list #t])
-          (test (if shared?
-                    `(shared ((-1- ,output))
-                       (list -1- -1-))
-                    `(list ,output ,output))
-                print-convert
-                (list object object))))))
+          (check-equal?
+           (print-convert
+            (list object object))
+           (if shared?
+               `(shared ((-1- ,output))
+                  (list -1- -1-))
+               `(list ,output ,output)))))))
   (define test-shared (make-pctest-shared #t))
   (define test-not-shared (make-pctest-shared #f))
   
@@ -375,43 +380,41 @@
   (test-shared (box 1) '(box 1))
   (test-shared (make-hash) '(make-hash)))
 
-(arity-test print-convert 1 2)
-(arity-test build-share 1 1)
-(arity-test get-shared 1 2)
-(arity-test print-convert-expr 3 3)
+(check-equal? (procedure-arity print-convert) (list 1 2))
+(check-equal? (procedure-arity build-share) 1)
+(check-equal? (procedure-arity get-shared) (list 1 2))
+(check-equal? (procedure-arity print-convert-expr) 3)
 
-(test 'empty print-convert '())
+(check-equal? (print-convert '()) 'empty)
 
 (let ([fn (make-temporary-file "pconvert.rktl-test~a")])
   (let ([in (open-input-file fn)])
-    (test `(open-input-file ,fn) print-convert in)
+    (check-equal? (print-convert in) `(open-input-file ,fn))
     (close-input-port in))
   (delete-file fn))
 
 (let ()
   (define-struct hidden (a))
   (define-struct visible (b) #:inspector (make-inspector))
-  (test '(make-hidden ...) print-convert (make-hidden 1))
-  (test '(make-visible 2) print-convert (make-visible 2)))
+  (check-equal? (print-convert (make-hidden 1)) '(make-hidden ...))
+  (check-equal? (print-convert (make-visible 2)) '(make-visible 2)))
 
 (let ([pc
-       (lambda (pv)
-         (lambda (x)
-           (parameterize ([booleans-as-true/false pv])
-             (print-convert x))))])
-  (test 'false (pc #t) #f)
-  (test 'true (pc #t) #t)
-  (test #f (pc #f) #f)
-  (test #t (pc #f) #t))
+       (lambda (pv x)
+         (parameterize ([booleans-as-true/false pv])
+           (print-convert x)))])
+  (check-equal? (pc #t #f) 'false)
+  (check-equal? (pc #t #t) 'true)
+  (check-equal? (pc #f #f) #f)
+  (check-equal? (pc #f #t) #t))
 
 (let ([pc
-       (λ (prefix?)
-         (λ (x)
-           (parameterize ([add-make-prefix-to-constructor prefix?])
-             (print-convert x))))])
+       (λ (prefix? x)
+         (parameterize ([add-make-prefix-to-constructor prefix?])
+           (print-convert x)))])
   (struct s (x) #:transparent)
-  (test '(s 1) (pc #f) (s 1))
-  (test '(make-s 1) (pc #t) (s 1)))
+  (check-equal? (pc #f (s 1)) '(s 1))
+  (check-equal? (pc #t (s 1)) '(make-s 1)))
 
 (let ()
   (define (pc x)
@@ -426,23 +429,23 @@
   (define lv (list v))
   (vector-set! v 0 lv)
 
-  (test '(shared ((-0- `(#&,-0-))) -0-) pc lb)
-  (test '(shared ((-0- `(#(,-0-)))) -0-) pc lv))
+  (check-equal? (pc lb) '(shared ((-0- `(#&,-0-))) -0-))
+  (check-equal? (pc lv) '(shared ((-0- `(#(,-0-)))) -0-)))
 
-(test '(make-prefab-struct 's 1) print-convert (make-prefab-struct 's 1))
+(check-equal? (print-convert (make-prefab-struct 's 1)) '(make-prefab-struct 's 1))
 
 (let ([pc
-       (lambda (pv)
-         (lambda (x)
-           (parameterize ([named/undefined-handler (lambda (x) 'whee)]
-                          [use-named/undefined-handler
-                           (lambda (x) pv)])
-             (print-convert x))))])
-  (test '(lambda (a1) ...) (pc #f) (let ([f (lambda (x) x)]) f))
-  (test 'whee (pc #t) (let ([f (lambda (x) x)]) f))
-  (test '(list whee whee) 
-        (pc #t) 
-        (let ([g (lambda (y) (let ([f (lambda (x) y)]) f))]) (list (g 1) (g 2)))))
+       (lambda (pv x)
+         (parameterize ([named/undefined-handler (lambda (x) 'whee)]
+                        [use-named/undefined-handler
+                         (lambda (x) pv)])
+           (print-convert x)))])
+  (check-equal? '(lambda (a1) ...) (pc #f (let ([f (lambda (x) x)]) f)))
+  (check-equal? (pc #t (let ([f (lambda (x) x)]) f)) 'whee)
+  (check-equal?
+   (pc #t
+       (let ([g (lambda (y) (let ([f (lambda (x) y)]) f))]) (list (g 1) (g 2)))) 
+   '(list whee whee)))
 
 ;; ----------------------------------------
 
@@ -451,12 +454,8 @@
     #:property prop:print-converter (lambda (v recur)
                                       `(PT! ,(recur (pt-y v))
                                             ,(recur (pt-x v)))))
-  (test '(PT! 2 3) print-convert (make-pt 3 2))
-  (test '(PT! 2 (list 3)) print-convert (make-pt '(3) 2))
+  (check-equal? (print-convert (make-pt 3 2)) '(PT! 2 3))
+  (check-equal? (print-convert (make-pt '(3) 2)) '(PT! 2 (list 3)))
   (let ([p (make-pt 1 2)])
     (set-pt-y! p p)
-    (test '(shared ([-0- (PT! -0- 1)]) -0-) print-convert p)))
-
-;; ----------------------------------------
-
-(report-errs)
+    (check-equal? (print-convert p) '(shared ([-0- (PT! -0- 1)]) -0-))))
