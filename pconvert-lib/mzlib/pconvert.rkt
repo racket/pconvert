@@ -16,6 +16,7 @@
            named/undefined-handler
            use-named/undefined-handler
            add-make-prefix-to-constructor
+           hash-table-constructor-with-lists
            
            print-convert
            print-convert-expr
@@ -46,6 +47,7 @@
   (define use-named/undefined-handler (make-parameter (lambda (x) #f)))
   (define named/undefined-handler (make-parameter (lambda (x) #f)))
   (define add-make-prefix-to-constructor (make-parameter #f))
+  (define hash-table-constructor-with-lists (make-parameter #f))
   
   ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   ;; share-hash is the hash-table containing info on what cons cells
@@ -315,12 +317,12 @@
                                     [(not answer)
                                      (build-unnamed)]
                                     [(let/ec k
-				       (eq?
-					(namespace-variable-value
-					 answer
-					 #t
+                                       (eq?
+                                        (namespace-variable-value
+                                         answer
+                                         #t
                                          (lambda () (k #f)))
-					expr))
+                                        expr))
                                      answer]
                                     [((use-named/undefined-handler) expr)
                                      ((named/undefined-handler) expr)]
@@ -367,12 +369,13 @@
                                        'box-immutable
                                        'box)
                                   ,(recur (unbox expr)))]
-                               [(hash-table? expr) 
+                               [(hash-table? expr)
+                                (define constructor (if (hash-table-constructor-with-lists) 'list 'cons))
                                 (let ([contents
                                        (hash-table-map
                                         expr
                                         (lambda (k v)
-                                          `(cons ,(recur k) ,(recur v))))]
+                                          `(,constructor ,(recur k) ,(recur v))))]
                                       [constructor
                                        (cond
                                          [(immutable? expr)

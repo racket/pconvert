@@ -445,6 +445,15 @@
        (let ([g (lambda (y) (let ([f (lambda (x) y)]) f))]) (list (g 1) (g 2)))) 
    '(list whee whee)))
 
+(check-equal? (print-convert (make-hash (list (cons 1 2))))
+              '(make-hash (list (cons 1 2))))
+(parameterize ([hash-table-constructor-with-lists #t])
+  (check-equal? (print-convert (make-hash (list (cons 1 2))))
+                '(make-hash (list (list 1 2)))))
+(parameterize ([hash-table-constructor-with-lists #f])
+  (check-equal? (print-convert (make-hash (list (cons 1 2))))
+                '(make-hash (list (cons 1 2)))))
+
 ;; ----------------------------------------
 
 (let ()
