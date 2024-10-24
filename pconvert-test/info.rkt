@@ -1,5 +1,7 @@
 #lang info
 (define deps '("base"
+               "pconvert-lib"
+               "rackunit-lib"
                "compatibility-lib")) ;; for mlist
 (define collection 'multi)
 
